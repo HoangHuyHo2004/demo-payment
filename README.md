@@ -38,7 +38,10 @@ Next.js (App Router, TypeScript) · Tailwind · Supabase (Postgres, Auth, RLS) �
 - `npm run mock:vendor` generates one transaction every 10 s across 2 × 8 pumps
   (`-- --every 3` to change the rate, `-- --count 20` for a one-off batch).
 - An open pump screen calls `POST /api/sync` every 5 s; Vercel Cron calls
-  `GET /api/cron/sync` every minute (`Authorization: Bearer $CRON_SECRET`).
+  `GET /api/cron/sync` (`Authorization: Bearer $CRON_SECRET`). On the Hobby
+  plan it runs once a day (`0 16 * * *`, i.e. 23:00–23:59 Vietnam time, before
+  the day closes). On Pro, set it to `* * * * *` in `vercel.json` as PLAN.md §6
+  intends.
 - Sync re-reads 10 min behind the newest transaction and upserts on
   `(station_id, invoice_no)`, so re-runs never duplicate. Failures and unmapped
   vendor pump IDs are written to `sync_state.last_error` and shown as a red
@@ -103,6 +106,18 @@ Next.js (App Router, TypeScript) · Tailwind · Supabase (Postgres, Auth, RLS) �
   cannot promote themselves or change the QR bank account).
 - `sync_state` is written only by the server (service role, bypasses RLS).
 - Helper functions live in the non-API `private` schema.
+
+## Deploy (Vercel)
+
+1. vercel.com → **Add New → Project** → import `HoangHuyHo2004/demo-payment`
+   (framework preset: Next.js, defaults are fine).
+2. Environment variables (Production): `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+   `VENDOR_MODE=mock`, `CRON_SECRET` (values as in `.env.local`; never
+   `SEED_PASSWORD`).
+3. Deploy. Every push to `main` redeploys.
+4. Check: `E2E_BASE_URL=https://<your-domain> npm run e2e`, then on an Android
+   phone open the site in Chrome → menu → **Install app / Add to Home screen**.
 
 ## Open items (PLAN.md §12)
 
