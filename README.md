@@ -23,6 +23,10 @@ Next.js (App Router, TypeScript) · Tailwind · Supabase (Postgres, Auth, RLS) �
 - `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`
 - Pumps by role: `npm test` runs `tests/pumps-by-role.test.ts` against the
   project in `.env.local` (skipped if env is missing; needs `seed:users`).
+- E2E (Playwright, Pixel 7 profile): `npm run e2e` against the local dev
+  server, or `E2E_BASE_URL=https://<deployment> npm run e2e` against a deploy.
+  Happy path: log in → pump → cash pay → QR pay → confirm → export. Seeds its
+  own mock vendor transactions and cleans them up (needs `.env.local`).
 - RLS: run `supabase/tests/rls_test.sql` in the Supabase SQL editor. It runs in
   a rolled-back transaction and returns `RLS OK` or raises `RLS FAIL: ...`.
 

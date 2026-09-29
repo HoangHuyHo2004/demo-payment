@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -15,6 +15,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Thanh toán cây xăng",
   description: "Thu tiền mặt và QR theo từng trụ bơm",
+  appleWebApp: { capable: true, title: "Cây xăng", statusBarStyle: "default" },
+  icons: { icon: "/icons/192.png", apple: "/icons/192.png" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#2563eb",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
