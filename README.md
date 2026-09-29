@@ -62,6 +62,20 @@ Next.js (App Router, TypeScript) · Tailwind · Supabase (Postgres, Auth, RLS) �
 - If a manual invoice no. later arrives from the vendor, sync merges it into the
   vendor row (same `(station_id, invoice_no)`); any payment stays attached.
 
+## Daily Excel report
+
+- Home → **Báo cáo** → choose station and date → `BaoCao_<code>_<YYYY-MM-DD>.xlsx`
+  (`GET /api/reports/daily?station_id=&date=`). Admins: any station; staff:
+  their own (RLS).
+- A business day is 00:00–24:00 Asia/Ho_Chi_Minh (UTC+7, no DST).
+- Sheet **Tổng hợp**: per fuel type, liters and revenue for cash, QR
+  (confirmed), "chưa thu" (unpaid + QR awaiting confirmation) and total.
+  Liters are summed as integer milliliters (exact).
+- Sheet **Chi tiết**: one row per transaction with time (Vietnam), pump,
+  invoice, fuel, liters, unit price, amount, method, cash received, status,
+  confirmed by, manual flag.
+- **Default layout** until the accountant's sample file arrives (PLAN.md §8).
+
 ## Access rules (RLS)
 
 - Staff read their own station's rows only; inactive staff see nothing; anon sees nothing.

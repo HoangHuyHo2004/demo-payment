@@ -74,11 +74,18 @@ function Shell({ title, name, children }: { title: string; name?: string; childr
           <h1 className="text-xl font-bold">{title}</h1>
           {name && <p className="text-sm text-neutral-500">{name}</p>}
         </div>
-        <form action={signOut}>
-          <button type="submit" className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700">
-            Đăng xuất
-          </button>
-        </form>
+        <div className="flex gap-2">
+          {name && (
+            <Link href="/reports" className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700">
+              Báo cáo
+            </Link>
+          )}
+          <form action={signOut}>
+            <button type="submit" className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700">
+              Đăng xuất
+            </button>
+          </form>
+        </div>
       </header>
       {children}
     </main>
