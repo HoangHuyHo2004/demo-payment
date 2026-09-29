@@ -44,7 +44,12 @@ export default async function PumpPage({ params }: PageProps<"/pumps/[id]">) {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 p-4">
       <Link href="/" className="text-sm text-blue-600">← Danh sách trụ</Link>
-      <h1 className="text-xl font-bold">{pump.label}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold">{pump.label}</h1>
+        <Link href={`/pumps/${id}/manual`} className="rounded-lg border border-orange-300 px-3 py-2 text-sm font-medium text-orange-700 dark:border-orange-800 dark:text-orange-300">
+          Nhập tay giao dịch
+        </Link>
+      </div>
       <SyncPoller stationId={pump.station_id} initialError={sync?.last_error ?? null} />
 
       {!txs?.length ? (

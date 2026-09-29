@@ -54,10 +54,20 @@ Next.js (App Router, TypeScript) · Tailwind · Supabase (Postgres, Auth, RLS) �
   `970436 / 0000000000 / TAI KHOAN THU NGHIEM` until the owner supplies real
   details. Update `stations.code` and `bank_accounts` in the SQL editor.
 
+## Manual entry (fallback)
+
+- Pump screen → **Nhập tay giao dịch**: pump, fuel type, liters, unit price,
+  amount (computed as liters × price rounded to whole đồng, editable) and an
+  optional invoice no. Rows get `source = manual` and a **NHẬP TAY** badge.
+- If a manual invoice no. later arrives from the vendor, sync merges it into the
+  vendor row (same `(station_id, invoice_no)`); any payment stays attached.
+
 ## Access rules (RLS)
 
 - Staff read their own station's rows only; inactive staff see nothing; anon sees nothing.
-- Staff may insert/update transactions and payments for their own station.
+- Staff may insert only `manual` transactions for their own station, and create/confirm
+  payments per the Phase 4 rules. Editing transactions is admin-only, so vendor data
+  stays unchanged.
 - Stations, pumps, staff and bank accounts are writable by admins only (so staff
   cannot promote themselves or change the QR bank account).
 - `sync_state` is written only by the server (service role, bypasses RLS).
