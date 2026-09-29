@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "seed:users": "node scripts/seed-users.ts"
+    "seed:users": "node scripts/seed-users.ts",
+    "mock:vendor": "node scripts/mock-vendor.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

@@ -12,7 +12,7 @@ Next.js (App Router, TypeScript) · Tailwind · Supabase (Postgres, Auth, RLS) �
 1. `npm install`
 2. Copy `.env.example` to `.env.local` and fill in the Supabase URL, anon key,
    service-role key and a dev `SEED_PASSWORD`.
-3. Apply the migrations in `supabase/migrations/` in filename order, then
+3. Apply the migrations in `supabase/migrations/` in filename order (SQL editor), then
    `supabase/seed.sql` (2 stations × 8 pumps).
 4. `npm run seed:users` creates `admin@petrol.test`, `staff1@petrol.test`
    (station 1) and `staff2@petrol.test` (station 2) with `SEED_PASSWORD`.
@@ -25,6 +25,20 @@ Next.js (App Router, TypeScript) · Tailwind · Supabase (Postgres, Auth, RLS) �
   project in `.env.local` (skipped if env is missing; needs `seed:users`).
 - RLS: run `supabase/tests/rls_test.sql` in the Supabase SQL editor. It runs in
   a rolled-back transaction and returns `RLS OK` or raises `RLS FAIL: ...`.
+
+## Vendor sync (mock)
+
+- `VendorClient` (`src/lib/vendor/`) is the only way business code reads vendor
+  data. `VENDOR_MODE=mock` selects `MockVendorClient`, which calls this app's
+  `/api/mock-vendor/transactions` (backed by `mock_vendor_transactions`).
+- `npm run mock:vendor` generates one transaction every 10 s across 2 × 8 pumps
+  (`-- --every 3` to change the rate, `-- --count 20` for a one-off batch).
+- An open pump screen calls `POST /api/sync` every 5 s; Vercel Cron calls
+  `GET /api/cron/sync` every minute (`Authorization: Bearer $CRON_SECRET`).
+- Sync re-reads 10 min behind the newest transaction and upserts on
+  `(station_id, invoice_no)`, so re-runs never duplicate. Failures and unmapped
+  vendor pump IDs are written to `sync_state.last_error` and shown as a red
+  banner on the pump screen.
 
 ## Access rules (RLS)
 
