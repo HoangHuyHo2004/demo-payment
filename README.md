@@ -76,6 +76,19 @@ Next.js (App Router, TypeScript) · Tailwind · Supabase (Postgres, Auth, RLS) �
   confirmed by, manual flag.
 - **Default layout** until the accountant's sample file arrives (PLAN.md §8).
 
+## Admin (`/admin`, admins only; others get 404)
+
+- **Nhân viên**: create logins (email + initial password, via the Auth admin
+  API server-side), assign station and role, deactivate. Admins can't lock out
+  or demote themselves.
+- **Cửa hàng, trụ & tài khoản NH**: QR bank account per station; pump display
+  names and vendor pump IDs (the mapping sync uses).
+- **Trạng thái đồng bộ**: last run, newest transaction and last error per station.
+- **Hủy thanh toán**: on a transaction with a confirmed payment, an admin enters
+  a reason; `reverse_payment` logs a snapshot + reason + admin in
+  `payment_reversals` (append-only) and removes the payment, so the
+  transaction is unpaid again. The history shows on the transaction screen.
+
 ## Access rules (RLS)
 
 - Staff read their own station's rows only; inactive staff see nothing; anon sees nothing.

@@ -101,3 +101,21 @@ export async function switchToCash(
   revalidatePath("/", "layout");
   redirect(pumpId ? `/pumps/${pumpId}` : "/");
 }
+
+// Admin only (checked again in the database by reverse_payment + RLS).
+export async function reversePayment(
+  txId: string,
+  paymentId: string,
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const { supabase, staff } = await session();
+  if (staff.role !== "admin") return { error: "Chỉ quản trị viên được hủy thanh toán." };
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (reason.length < 3) return { error: "Vui lòng nhập lý do (ít nhất 3 ký tự)." };
+
+  const { error } = await supabase.rpc("reverse_payment", { p_payment_id: paymentId, p_reason: reason });
+  if (error) return { error: friendly(error) };
+  revalidatePath("/", "layout");
+  redirect(`/transactions/${txId}`);
+}

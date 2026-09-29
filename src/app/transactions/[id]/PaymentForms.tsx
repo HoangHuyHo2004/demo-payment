@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { confirmQr, payCash, startQr, switchToCash, type ActionState } from "./actions";
+import { confirmQr, payCash, reversePayment, startQr, switchToCash, type ActionState } from "./actions";
 
 const initial: ActionState = { error: null };
 const vnd = new Intl.NumberFormat("vi-VN");
@@ -98,5 +98,32 @@ export function PendingQrActions({ txId, paymentId, amountDue }: { txId: string;
         Khách trả tiền mặt thay vì QR
       </button>
     </div>
+  );
+}
+
+export function ReversePaymentForm({ txId, paymentId }: { txId: string; paymentId: string }) {
+  const [open, setOpen] = useState(false);
+  const [state, action, pending] = useActionState(reversePayment.bind(null, txId, paymentId), initial);
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="self-start text-sm text-red-700 underline">
+        Hủy thanh toán (quản trị)
+      </button>
+    );
+  }
+  return (
+    <form action={action} className="flex flex-col gap-2 rounded-xl border border-red-200 p-3 dark:border-red-900">
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        Lý do hủy (được ghi lại)
+        <textarea name="reason" required minLength={3} rows={2} className="rounded-lg border border-neutral-300 px-3 py-2 text-base dark:border-neutral-700 dark:bg-neutral-900" />
+      </label>
+      <ErrorText error={state.error} />
+      <div className="flex gap-2">
+        <button type="submit" disabled={pending} className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white disabled:opacity-60">
+          {pending ? "Đang hủy…" : "Xác nhận hủy"}
+        </button>
+        <button type="button" onClick={() => setOpen(false)} className="px-3 text-sm text-neutral-500">Thôi</button>
+      </div>
+    </form>
   );
 }

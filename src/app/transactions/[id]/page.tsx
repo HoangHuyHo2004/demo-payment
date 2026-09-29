@@ -4,7 +4,7 @@ import QRCode from "qrcode";
 import { getCurrentStaff } from "@/lib/supabase/server";
 import { formatLiters, formatTime, formatVnd, paymentStatusLabel } from "@/lib/format";
 import { buildVietQrPayload } from "@/lib/vietqr";
-import { PendingQrActions, UnpaidActions } from "./PaymentForms";
+import { PendingQrActions, ReversePaymentForm, UnpaidActions } from "./PaymentForms";
 
 type Payment = {
   id: string;
@@ -18,7 +18,8 @@ type Payment = {
 
 export default async function TransactionPage({ params }: PageProps<"/transactions/[id]">) {
   const { id } = await params;
-  const { supabase } = await getCurrentStaff();
+  const { supabase, staff } = await getCurrentStaff();
+  const isAdmin = staff?.role === "admin";
 
   // RLS: another station's transaction simply isn't found.
   const { data: tx } = await supabase
@@ -32,13 +33,20 @@ export default async function TransactionPage({ params }: PageProps<"/transactio
     }>();
   if (!tx) notFound();
 
-  const [{ data: payment }, { data: bank }] = await Promise.all([
+  const [{ data: payment }, { data: bank }, { data: reversals }] = await Promise.all([
     supabase
       .from("payments")
       .select("id, method, status, cash_amount, qr_ref, confirmed_at, confirmer:staff!payments_confirmed_by_fkey(full_name)")
       .eq("transaction_id", id)
       .maybeSingle<Payment>(),
     supabase.from("bank_accounts").select("bank_bin, account_no, account_name").eq("station_id", tx.station_id).limit(1).maybeSingle(),
+    // RLS: only admins can read the reversal log; staff get an empty list.
+    supabase
+      .from("payment_reversals")
+      .select("id, reason, reversed_at, payment, reverser:staff!payment_reversals_reversed_by_fkey(full_name)")
+      .eq("transaction_id", id)
+      .order("reversed_at", { ascending: false })
+      .returns<{ id: string; reason: string; reversed_at: string; payment: { method: string; status: string }; reverser: { full_name: string } | null }[]>(),
   ]);
 
   const pendingQr = payment?.method === "qr" && payment.status === "pending" ? payment : null;
@@ -90,6 +98,19 @@ export default async function TransactionPage({ params }: PageProps<"/transactio
             )}
           </section>
 
+          {isAdmin && payment?.status === "confirmed" && <ReversePaymentForm txId={tx.id} paymentId={payment.id} />}
+          {!!reversals?.length && (
+            <section className="text-sm">
+              <h2 className="font-semibold">Lịch sử hủy thanh toán</h2>
+              <ul className="mt-1 flex flex-col gap-1 text-neutral-600 dark:text-neutral-400">
+                {reversals.map((r) => (
+                  <li key={r.id}>
+                    {formatTime(r.reversed_at)} · {r.reverser?.full_name} hủy {r.payment.method === "cash" ? "tiền mặt" : "QR"}: “{r.reason}”
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {!payment && <UnpaidActions txId={tx.id} amountDue={tx.amount} qrAvailable={Boolean(bank)} />}
           {pendingQr && !bank && (
             <p className="text-sm text-amber-700">Chưa cấu hình tài khoản ngân hàng cho cửa hàng này.</p>

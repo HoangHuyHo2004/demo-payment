@@ -37,7 +37,7 @@ export default async function Home() {
   }));
 
   return (
-    <Shell title={staff.role === "admin" ? "Tất cả cửa hàng" : (byStation[0]?.name ?? "Trụ bơm")} name={staff.full_name}>
+    <Shell title={staff.role === "admin" ? "Tất cả cửa hàng" : (byStation[0]?.name ?? "Trụ bơm")} name={staff.full_name} admin={staff.role === "admin"}>
       {byStation.map((s) => (
         <section key={s.id} className="flex flex-col gap-3">
           {staff.role === "admin" && <h2 className="text-lg font-semibold">{s.name}</h2>}
@@ -66,7 +66,7 @@ export default async function Home() {
   );
 }
 
-function Shell({ title, name, children }: { title: string; name?: string; children: React.ReactNode }) {
+function Shell({ title, name, admin, children }: { title: string; name?: string; admin?: boolean; children: React.ReactNode }) {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 p-4">
       <header className="flex items-center justify-between gap-3">
@@ -75,6 +75,11 @@ function Shell({ title, name, children }: { title: string; name?: string; childr
           {name && <p className="text-sm text-neutral-500">{name}</p>}
         </div>
         <div className="flex gap-2">
+          {admin && (
+            <Link href="/admin" className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700">
+              Quản trị
+            </Link>
+          )}
           {name && (
             <Link href="/reports" className="rounded-lg border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700">
               Báo cáo
