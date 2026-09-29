@@ -21,6 +21,8 @@ Next.js (App Router, TypeScript) · Tailwind · Supabase (Postgres, Auth, RLS) �
 ## Checks
 
 - `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`
+- Pumps by role: `npm test` runs `tests/pumps-by-role.test.ts` against the
+  project in `.env.local` (skipped if env is missing; needs `seed:users`).
 - RLS: run `supabase/tests/rls_test.sql` in the Supabase SQL editor. It runs in
   a rolled-back transaction and returns `RLS OK` or raises `RLS FAIL: ...`.
 
