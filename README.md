@@ -40,6 +40,20 @@ Next.js (App Router, TypeScript) · Tailwind · Supabase (Postgres, Auth, RLS) �
   vendor pump IDs are written to `sync_state.last_error` and shown as a red
   banner on the pump screen.
 
+## Payments
+
+- Tap a transaction → **Tiền mặt** (enter cash received, prefilled with the
+  amount due) or **QR** (full-screen VietQR with the exact amount; staff tap
+  **Đã nhận tiền** after seeing the bank notification, or switch to cash).
+- VietQR payload is built in `src/lib/vietqr.ts` (NAPAS/EMVCo fields + CRC16).
+- `qr_ref` = `XD` + station code + base-36 counter (DB sequence), e.g. `XDS13`.
+- The `payments_guard` trigger makes confirmed payments final for staff; only
+  a pending QR can change (to confirmed QR or to cash), always confirmed by the
+  current user. Admin reversal arrives in Phase 7.
+- **Placeholders:** station codes `S1`/`S2` and bank account
+  `970436 / 0000000000 / TAI KHOAN THU NGHIEM` until the owner supplies real
+  details. Update `stations.code` and `bank_accounts` in the SQL editor.
+
 ## Access rules (RLS)
 
 - Staff read their own station's rows only; inactive staff see nothing; anon sees nothing.

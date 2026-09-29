@@ -55,7 +55,8 @@ export default async function PumpPage({ params }: PageProps<"/pumps/[id]">) {
             const payment = Array.isArray(t.payments) ? (t.payments[0] ?? null) : t.payments;
             const status = paymentStatusLabel(payment);
             return (
-              <li key={t.id} className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800">
+              <li key={t.id}>
+                <Link href={`/transactions/${t.id}`} className="block rounded-xl border border-neutral-200 p-3 active:bg-neutral-100 dark:border-neutral-800 dark:active:bg-neutral-900">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-lg font-semibold">{formatVnd(t.amount)}</span>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[status] ?? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300"}`}>
@@ -72,6 +73,7 @@ export default async function PumpPage({ params }: PageProps<"/pumps/[id]">) {
                   </span>
                   <span>{formatTime(t.fueled_at)}</span>
                 </div>
+                </Link>
               </li>
             );
           })}

@@ -22,3 +22,10 @@ export function paymentStatusLabel(p: PaymentLike): string {
   if (p.method === "cash") return "Tiền mặt";
   return p.status === "confirmed" ? "QR – đã xác nhận" : "QR – chờ xác nhận";
 }
+
+// "150.000" / "150,000" / "150000 đ" -> 150000; null if not a whole VND amount.
+export function parseVnd(raw: unknown): number | null {
+  const digits = String(raw ?? "").replace(/[.,\sđ]/g, "");
+  if (!/^\d{1,12}$/.test(digits)) return null;
+  return Number(digits);
+}
