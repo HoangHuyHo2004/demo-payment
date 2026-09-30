@@ -36,6 +36,10 @@ for (const u of users) {
     });
     if (error) throw error;
     id = data.user.id;
+  } else {
+    // Keep dev logins in sync with SEED_PASSWORD when it changes.
+    const { error } = await supabase.auth.admin.updateUserById(id, { password });
+    if (error) throw error;
   }
   const { error } = await supabase
     .from("staff")
