@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import type { FuelType } from "./vendor/types";
+import type { FuelType } from "./types";
 import { FUEL_TYPES } from "./manual-entry";
 
 // Vietnam has no DST: a business day is [D 00:00 +07:00, D+1 00:00 +07:00).

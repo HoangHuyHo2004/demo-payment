@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentStaff } from "@/lib/supabase/server";
 import { formatLiters, formatTime, formatVnd, paymentStatusLabel } from "@/lib/format";
-import { SyncPoller } from "./SyncPoller";
+import { getStationSync } from "@/lib/sync-status";
+import { AutoRefresh } from "@/components/AutoRefresh";
+import { SyncBanner } from "@/components/SyncBanner";
 
 type Payment = { method: "cash" | "qr"; status: "pending" | "confirmed" };
 type Tx = {
@@ -30,7 +32,7 @@ export default async function PumpPage({ params }: PageProps<"/pumps/[id]">) {
   const { data: pump } = await supabase.from("pumps").select("label, station_id").eq("id", id).maybeSingle();
   if (!pump) notFound();
 
-  const [{ data: txs }, { data: sync }] = await Promise.all([
+  const [{ data: txs }, sync] = await Promise.all([
     supabase
       .from("transactions")
       .select("id, invoice_no, fuel_type, volume, unit_price, amount, fueled_at, source, payments(method, status)")
@@ -38,7 +40,7 @@ export default async function PumpPage({ params }: PageProps<"/pumps/[id]">) {
       .order("fueled_at", { ascending: false })
       .limit(50)
       .returns<Tx[]>(),
-    supabase.from("sync_state").select("last_error").eq("station_id", pump.station_id).maybeSingle(),
+    getStationSync(supabase, pump.station_id),
   ]);
 
   return (
@@ -50,7 +52,8 @@ export default async function PumpPage({ params }: PageProps<"/pumps/[id]">) {
           Nhập tay giao dịch
         </Link>
       </div>
-      <SyncPoller stationId={pump.station_id} initialError={sync?.last_error ?? null} />
+      <AutoRefresh />
+      <SyncBanner stations={sync} manualHref={`/pumps/${id}/manual`} />
 
       {!txs?.length ? (
         <p className="text-neutral-500">Chưa có giao dịch.</p>

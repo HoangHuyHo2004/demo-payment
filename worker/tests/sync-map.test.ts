@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { mapVendorTransactions } from "@/lib/sync";
-import type { VendorTransaction } from "@/lib/vendor/types";
+import { mapVendorTransactions } from "../src/sync.ts";
+import type { VendorTransaction } from "../src/vendor/types.ts";
 
 const tx = (over: Partial<VendorTransaction> = {}): VendorTransaction => ({
   vendor_pump_id: "P1",

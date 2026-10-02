@@ -11,7 +11,8 @@
     "test": "vitest run --passWithNoTests",
     "seed:users": "node scripts/seed-users.ts",
     "mock:vendor": "node scripts/mock-vendor.ts",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "worker": "npm --prefix worker run dev"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

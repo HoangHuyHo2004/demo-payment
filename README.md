@@ -5,7 +5,8 @@ See [PLAN.md](PLAN.md) for the full spec and build phases.
 
 ## Stack
 
-Next.js (App Router, TypeScript) · Tailwind · Supabase (Postgres, Auth, RLS) · Vitest
+Next.js (App Router, TypeScript) · Tailwind · Supabase (Postgres, Auth, RLS) · Vitest ·
+a separate Playwright **portal worker** (`worker/`) that reads the vendor's web portal
 
 ## Setup
 
@@ -16,36 +17,57 @@ Next.js (App Router, TypeScript) · Tailwind · Supabase (Postgres, Auth, RLS) �
    `supabase/seed.sql` (2 stations × 8 pumps).
 4. `npm run seed:users` creates `admin@petrol.test`, `staff1@petrol.test`
    (station 1) and `staff2@petrol.test` (station 2) with `SEED_PASSWORD`.
-5. `npm run dev`
+5. `npm run dev` (web app) and, in a second terminal, `npm run worker`
+   (portal worker + mock portal; first time: `npm --prefix worker install` and
+   `npx --prefix worker playwright install chromium`).
 
 ## Checks
 
 - `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`
 - Pumps by role: `npm test` runs `tests/pumps-by-role.test.ts` against the
   project in `.env.local` (skipped if env is missing; needs `seed:users`).
-- E2E (Playwright, Pixel 7 profile): `npm run e2e` against the local dev
-  server, or `E2E_BASE_URL=https://<deployment> npm run e2e` against a deploy.
-  Happy path: log in → pump → cash pay → QR pay → confirm → export. Seeds its
-  own mock vendor transactions and cleans them up (needs `.env.local`).
+- Worker: `npm --prefix worker test` (portal login, session expiry re-login,
+  CAPTCHA/OTP stop, backoff, sync against Supabase) and
+  `npm --prefix worker run typecheck`.
+- E2E (Playwright, Pixel 7 profile): `npm run e2e` starts the web app and the
+  worker locally, or `E2E_BASE_URL=https://<deployment> npm run e2e` against a
+  deploy (the worker must be running). Happy path: log in → pump → cash pay →
+  QR pay → confirm → export. Seeds its own mock portal transactions and cleans
+  them up (needs `.env.local`).
 - RLS: run `supabase/tests/rls_test.sql` in the Supabase SQL editor. It runs in
   a rolled-back transaction and returns `RLS OK` or raises `RLS FAIL: ...`.
 
-## Vendor sync (mock)
+## Vendor portal reader (worker)
 
-- `VendorClient` (`src/lib/vendor/`) is the only way business code reads vendor
-  data. `VENDOR_MODE=mock` selects `MockVendorClient`, which calls this app's
-  `/api/mock-vendor/transactions` (backed by `mock_vendor_transactions`).
-- `npm run mock:vendor` generates one transaction every 10 s across 2 × 8 pumps
-  (`-- --every 3` to change the rate, `-- --count 20` for a one-off batch).
-- An open pump screen calls `POST /api/sync` every 5 s; Vercel Cron calls
-  `GET /api/cron/sync` (`Authorization: Bearer $CRON_SECRET`). On the Hobby
-  plan it runs once a day (`0 16 * * *`, i.e. 23:00–23:59 Vietnam time, before
-  the day closes). On Pro, set it to `* * * * *` in `vercel.json` as PLAN.md §6
-  intends.
-- Sync re-reads 10 min behind the newest transaction and upserts on
-  `(station_id, invoice_no)`, so re-runs never duplicate. Failures and unmapped
-  vendor pump IDs are written to `sync_state.last_error` and shown as a red
-  banner on the pump screen.
+There is no vendor API. `worker/` is a separate Node.js service that logs in to
+the vendor's web portal with one read-only account per station, reads new
+transactions and writes them to Supabase. The web app never talks to the
+portal; it only reads Supabase.
+
+- `VendorClient` (`worker/src/vendor/types.ts`) is the only interface the
+  worker's sync code uses. `VENDOR_MODE` selects the implementation:
+  - `mock`: logs in to the **mock portal** (`worker/src/mock-portal/`, a fake
+    site with a login page and a transaction table) with Playwright, then reads
+    the JSON endpoint its transaction page uses. `npm run worker` starts both.
+  - `portal_http` / `portal_scrape`: the real portal. **Not implemented until
+    Phase 3b**, which needs the owner's portal access and the vendor's written
+    OK (PLAN.md §12).
+- Behaviour: one logged-in session per station, automatic re-login when the
+  session expires, poll every 5 s, at least 1 s between portal requests per
+  station, upsert on `(station_id, invoice_no)` with a 10-minute re-read window
+  (re-runs never duplicate). On errors it backs off 5 s → 15 s → 60 s.
+- **Read-only:** the only form the worker ever submits is the login. If the
+  login page shows a CAPTCHA or OTP the worker stops polling that station,
+  records the problem and waits for an operator. It never tries to bypass it.
+- `sync_state`: `last_run_at` (every attempt), `last_success_at` (fully
+  successful runs only), `last_error`. Unmapped vendor pump IDs count as an
+  error. When `last_success_at` is more than 30 s old the app shows the red
+  banner **"Mất kết nối dữ liệu trạm"** with a link to manual entry; admins see
+  details under **Quản trị → Trạng thái đồng bộ**.
+- `npm run mock:vendor` adds one transaction every 10 s to the mock portal's
+  data across 2 × 8 pumps (`-- --every 3`, or `-- --count 20` for a batch).
+  `npm --prefix worker run portal` runs just the mock portal
+  (http://127.0.0.1:4010/login, `tram1` / `mock-portal-1`).
 
 ## Payments
 
@@ -107,20 +129,37 @@ Next.js (App Router, TypeScript) · Tailwind · Supabase (Postgres, Auth, RLS) �
 - `sync_state` is written only by the server (service role, bypasses RLS).
 - Helper functions live in the non-API `private` schema.
 
-## Deploy (Vercel)
+## Deploy
+
+**Web app (Vercel)**
 
 1. vercel.com → **Add New → Project** → import `HoangHuyHo2004/demo-payment`
    (framework preset: Next.js, defaults are fine).
 2. Environment variables (Production): `NEXT_PUBLIC_SUPABASE_URL`,
-   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
-   `VENDOR_MODE=mock`, `CRON_SECRET` (values as in `.env.local`; never
-   `SEED_PASSWORD`).
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (values as in
+   `.env.local`; never `SEED_PASSWORD`). No cron and no vendor settings: the
+   web app only reads Supabase, so the Hobby plan is enough.
 3. Deploy. Every push to `main` redeploys.
-4. Check: `E2E_BASE_URL=https://<your-domain> npm run e2e`, then on an Android
-   phone open the site in Chrome → menu → **Install app / Add to Home screen**.
+4. Check: `E2E_BASE_URL=https://<your-domain> npm run e2e` (with the worker
+   running), then on an Android phone open the site in Chrome → menu →
+   **Install app / Add to Home screen**.
+
+**Portal worker (small VPS, Docker)**
+
+1. Copy the `worker/` folder to the VPS and create `worker/.env` from
+   `worker/.env.example` (Supabase URL, service-role key, `VENDOR_MODE`, and
+   for the real portal `PORTAL_URL` + `PORTAL_ACCOUNTS`). Secrets stay on the
+   VPS only.
+2. `docker compose up -d --build`: runs 24/7 with `restart: unless-stopped`.
+   Logs: `docker compose logs -f`.
+3. If every station stops on a CAPTCHA/OTP the worker stays idle on purpose
+   (it does not exit, so Docker does not retry the login in a loop). Fix the
+   login, then `docker compose restart`.
 
 ## Open items (PLAN.md §12)
 
+Vendor's written OK for automated read-only portal access; portal URL and a
+read-only login per station; screenshots of the portal's transaction page.
 Bank details per station, station short codes for `qr_ref`, whether staff may
 download reports, and a sample of the accountant's Excel file. Bank accounts are
 not seeded until real details arrive.

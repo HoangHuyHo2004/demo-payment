@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The portal worker is a separate package with its own tsconfig and tests.
+    "worker/**",
   ]),
 ]);
 

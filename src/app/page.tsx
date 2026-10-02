@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { getCurrentStaff } from "@/lib/supabase/server";
 import { signOut } from "./login/actions";
+import { getStationSync } from "@/lib/sync-status";
+import { AutoRefresh } from "@/components/AutoRefresh";
+import { SyncBanner } from "@/components/SyncBanner";
 
 type PumpRow = {
   id: string;
@@ -24,9 +27,10 @@ export default async function Home() {
   }
 
   // RLS limits both queries to the staff member's station (admins see all).
-  const [{ data: stations }, { data: pumps }] = await Promise.all([
+  const [{ data: stations }, { data: pumps }, sync] = await Promise.all([
     supabase.from("stations").select("id, name").order("name"),
     supabase.from("pump_list").select("id, station_id, label, vendor_pump_id, unpaid_count"),
+    getStationSync(supabase),
   ]);
 
   const byStation = (stations ?? []).map((s) => ({
@@ -38,6 +42,8 @@ export default async function Home() {
 
   return (
     <Shell title={staff.role === "admin" ? "Tất cả cửa hàng" : (byStation[0]?.name ?? "Trụ bơm")} name={staff.full_name} admin={staff.role === "admin"}>
+      <AutoRefresh />
+      <SyncBanner stations={sync} showNames={staff.role === "admin"} />
       {byStation.map((s) => (
         <section key={s.id} className="flex flex-col gap-3">
           {staff.role === "admin" && <h2 className="text-lg font-semibold">{s.name}</h2>}

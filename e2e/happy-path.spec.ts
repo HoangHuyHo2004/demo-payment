@@ -1,6 +1,7 @@
 // PLAN.md §10 Phase 7: log in → pump → cash pay → QR pay → confirm → export.
-// Seeds two mock vendor transactions (service role, from .env.local) so the
-// run is independent of existing data, and removes everything it created.
+// Seeds two transactions in the mock portal's data (service role, from
+// .env.local); the portal worker must be running to sync them into the app.
+// Removes everything it created.
 import { config } from "dotenv";
 import ExcelJS from "exceljs";
 import { expect, test } from "@playwright/test";
@@ -51,7 +52,7 @@ test("staff: log in → pump → cash → QR → confirm → export", async ({ p
   await page.getByRole("button", { name: "Đăng nhập" }).click();
   await expect(page.getByRole("heading", { name: "Cửa hàng xăng dầu số 1" })).toBeVisible();
 
-  // Pump screen: the seeded vendor transactions sync in (≤ 5 s poll)
+  // Pump screen: the worker reads the seeded rows from the mock portal (≤ 10 s)
   await page.getByRole("link", { name: /^Trụ 3/ }).click();
   const cashRow = page.getByRole("link", { name: new RegExp(CASH_INV) });
   const qrRow = page.getByRole("link", { name: new RegExp(QR_INV) });

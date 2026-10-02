@@ -1,5 +1,5 @@
 import { parseVnd } from "./format";
-import type { FuelType } from "./vendor/types";
+import type { FuelType } from "./types";
 
 export const FUEL_TYPES: FuelType[] = ["A95", "E5", "DO"];
 

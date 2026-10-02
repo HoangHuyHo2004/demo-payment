@@ -12,7 +12,12 @@ export default defineConfig({
   reporter: [["list"]],
   use: { baseURL, trace: "retain-on-failure", locale: "vi-VN", timezoneId: "Asia/Ho_Chi_Minh" },
   projects: [{ name: "android-phone", use: { ...devices["Pixel 7"] } }],
+  // Locally: the web app plus the portal worker (which starts the mock portal).
+  // Against a deployment, the worker is expected to be running on its VPS.
   webServer: process.env.E2E_BASE_URL
     ? undefined
-    : { command: "npm run dev", url: baseURL, reuseExistingServer: true, timeout: 120_000 },
+    : [
+        { command: "npm run dev", url: baseURL, reuseExistingServer: true, timeout: 120_000 },
+        { command: "npm run worker", url: "http://127.0.0.1:4010/healthz", reuseExistingServer: true, timeout: 120_000 },
+      ],
 });

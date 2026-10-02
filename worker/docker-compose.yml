@@ -1,0 +1,13 @@
+# On the VPS:  docker compose up -d --build     (logs: docker compose logs -f)
+# Secrets live in worker/.env on the VPS only (see .env.example); never in git.
+services:
+  worker:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    init: true
+    # Chromium needs more shared memory than Docker's 64 MB default.
+    shm_size: "512mb"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
