@@ -11,8 +11,9 @@ A mobile-first web app that station staff use on a smartphone. It shows each pum
 - 2 stations with 8 pumps each and one owner. Fuel types: A95, E5, DO.
 - Each station already runs a third-party station management system (the "vendor") that is connected to the pump controllers. A transaction appears in the vendor system as soon as fueling stops.
 - The vendor system already issues per-transaction e-invoices. **This app only reads the invoice number. It never issues or changes invoices.**
-- **The vendor API is read-only for us.** We do not write payment method or anything else back.
-- The vendor API documentation is not available yet, so build against a **mock vendor API** behind an adapter that can be swapped later.
+- **There is no vendor API.** Transaction data comes from the vendor's web portal, reachable over the internet. A background worker logs in to the portal with a station account and reads new transactions (see section 6).
+- **Access is read-only.** The worker only logs in, navigates and reads. It must never click, submit or change anything in the portal, and we write nothing back.
+- Development uses a **mock portal** first. The real portal is connected only after the owner provides access details and has confirmed with the vendor that automated reading is allowed.
 - The bank API for automatic QR confirmation will come later. For now, staff confirm QR payments manually.
 - Both stations have stable internet. Each station has 1–2 phones, and each staff member has their own login.
 - The UI is in **Vietnamese**, and all money is in VND.
@@ -27,10 +28,11 @@ A mobile-first web app that station staff use on a smartphone. It shows each pum
 | QR | VietQR (NAPAS/EMVCo) payload generated in our code, rendered with the `qrcode` package |
 | Excel | `exceljs` |
 | Tests | Vitest for unit tests, Playwright for one end-to-end happy path |
+| Portal worker | Separate Node.js (TypeScript) service using Playwright, running 24/7 on a small VPS (or Railway/Fly.io), and writing to Supabase |
 
 **Rules for vendor data:**
-- Call the vendor API only from server-side code. Never call it from the browser.
-- Keep the Supabase service-role key server-side only.
+- Only the worker talks to the vendor portal. The web app and browsers never do.
+- Keep the portal credentials and the Supabase service-role key on the worker or server only. Never put them in the frontend or in git.
 
 ## 4. Data model
 
@@ -63,14 +65,27 @@ Rules:
 
 **`qr_ref` format:** short, uppercase alphanumeric, unique, 25 characters or fewer, for example `XD` + station code + a base-36 counter. Banks may strip other characters, and the future bank webhook will match payments on this code plus the amount.
 
-## 6. Vendor integration (mock first)
+## 6. Vendor portal reader (worker)
 
-- Define a `VendorClient` interface with one method: `listTransactions(stationId, since)`. It returns `{ vendor_pump_id, fuel_type, volume, unit_price, amount, fueled_at, invoice_no }[]`.
-- Implement `MockVendorClient`: an in-app mock endpoint (`/api/mock-vendor/...`, enabled only when `VENDOR_MODE=mock`) plus a dev script that generates realistic transactions across 2 stations × 8 pumps.
-- **Sync strategy (polling):**
-  - While a pump screen is open, the client asks our server to sync every 5 seconds. The server calls the vendor and upserts rows by `(station_id, invoice_no)`.
-  - A Vercel cron runs every minute and syncs both stations, so data stays complete even when no one has the app open.
-  - Record errors in `sync_state`. If sync fails, show a visible warning banner on screen.
+**Interface:**
+- Keep the `VendorClient` interface with one method: `listTransactions(stationId, since)`. It returns `{ vendor_pump_id, fuel_type, volume, unit_price, amount, fueled_at, invoice_no }[]`.
+- The rest of the app depends only on this interface.
+
+**Implementations**, selected with the environment variable `VENDOR_MODE`:
+1. `mock`: talks to a mock portal, a small fake website with a login page and a transaction table, plus a script that generates transactions across 2 stations × 8 pumps. All development and testing uses this mode.
+2. `portal_http` (preferred): log in once with Playwright to get the session cookie, then call the JSON endpoint that the portal's own transaction page uses. Find that endpoint in Phase 3b.
+3. `portal_scrape` (fallback): if no usable JSON endpoint exists, read the transaction table from the page itself with Playwright.
+
+**Worker behaviour:**
+- Keep one logged-in session per station. Detect when a session expires and log in again automatically.
+- Poll each station every 5 seconds, and upsert rows by `(station_id, invoice_no)`.
+- After each run, update `sync_state` (last success, last error). On errors, back off: retry after 5 s, then 15 s, then 60 s.
+- If the login page shows a CAPTCHA or OTP, stop and report the problem. Never try to bypass it.
+- Throttle all requests and use one session per station, so the vendor's site is not overloaded.
+
+**In the app:**
+- If a station's last successful sync is more than 30 seconds old, show a red banner "Mất kết nối dữ liệu trạm" and point staff to manual entry (section 7).
+- The worker handles all syncing; the web app only reads from Supabase. There is no in-app mock vendor API, no client-triggered sync and no Vercel cron.
 
 ## 7. Manual fallback entry
 
@@ -99,24 +114,33 @@ Each phase ends with a verification step that must pass before moving on.
    → Verify: migrations apply cleanly, and RLS tests show that staff from station A cannot read station B's data.
 2. **Auth and pumps:** Vietnamese login screen and the pump list for the staff member's station.
    → Verify: each role sees the correct pumps.
-3. **Mock vendor and sync:** `VendorClient`, the mock, the sync endpoint, the cron, and `sync_state`.
-   → Verify: generated mock transactions appear within 5 s, and re-running sync creates no duplicates.
+3. **Mock portal and worker:** `VendorClient`, the mock portal, the worker in `mock` mode, and `sync_state`.
+   → Verify: generated mock transactions appear in the app within 10 s, re-running sync creates no duplicates, and the worker re-logs in automatically after a forced session expiry.
+
+   **3b. Real portal** (only after the owner provides the open items in section 12):
+   - With the owner's account, log in manually in a Playwright session.
+   - Record the network requests made by the transaction page and decide between `portal_http` and `portal_scrape`.
+   - Report the findings to the owner before implementing.
+   → Verify: the worker reads one day of real transactions, and they match the portal exactly (count and totals).
 4. **Payments:** the cash flow, VietQR generation, and QR manual confirmation.
    → Verify: unit tests for the VietQR payload (field layout and CRC16) pass, and a real banking app scans the test QR with the correct amount prefilled (test with a small amount on the owner's account).
 5. **Manual entry:** the fallback form and the `source` flag.
    → Verify: manual rows appear in the list and in reports, marked as manual.
 6. **Excel report:** summary and detail sheets.
    → Verify: totals equal the sum of the transactions for the day, and day boundaries use Vietnam time.
-7. **Admin and deploy:** admin screens, Vercel deploy, environment variables, and a PWA install check on Android.
+7. **Admin and deploy:** admin screens, Vercel deploy, environment variables, a PWA install check on Android, and the worker deployed to a VPS with auto-restart (e.g. Docker + restart policy).
    → Verify: the Playwright happy path (log in → pump → cash pay → QR pay → confirm → export) passes against the deployed app.
 
 ## 11. Later (do not build now)
 
-- **Real vendor API:** implement `HttpVendorClient` once the documentation arrives. The swap happens through the `VENDOR_MODE` environment variable.
+- **Vendor API:** if the vendor ever offers an official API, implement it as another `VendorClient` and retire the portal reader.
 - **Bank API:** add a webhook endpoint that matches `qr_ref` plus the amount and auto-confirms the payment. Keep manual confirmation as a fallback.
 
 ## 12. Open items (ask the owner, do not assume)
 
+- The vendor's written OK for automated read-only access to the portal.
+- The portal URL and a dedicated read-only login for each station, with no CAPTCHA or OTP if possible.
+- Screenshots of the transaction page. Confirm it shows pump ID, fuel type, volume, unit price, amount, time and invoice no.
 - A sample of the accountant's current daily Excel file.
 - Bank name/BIN, account number and account name for each station (one shared account or one per station?).
 - Whether staff may download the daily report, or only admins.
